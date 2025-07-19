@@ -1,0 +1,30 @@
+[project]
+name = "pokemon-sv-damage-calc-mcp"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Yusuke Fukasawa",email = "demonstrundum@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12,<4.0"
+dependencies = [
+    "requests (>=2.32.3,<3.0.0)",
+    "pandas (>=2.2.3,<3.0.0)",
+    "click (>=8.1.8,<9.0.0)",
+    "pytz (>=2025.1,<2026.0)",
+    "numpy (<2.0)",
+    "fastapi (>=0.115.14,<0.116.0)",
+    "uvicorn (>=0.35.0,<0.36.0)",
+    "pytest (>=8.4.1,<9.0.0)",
+]
+
+[tool.poetry]
+version = "2.0"
+package-mode = false
+
+[tool.poetry.group.dev.dependencies]
+jupyter = "^1.1.1"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
