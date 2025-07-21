@@ -149,7 +149,8 @@ class DamageResult:
     
     # KO情報
     ko_probability: float  # 一撃KO確率
-    guaranteed_ko_hits: int  # 確定KOまでの攻撃回数
+    guaranteed_ko_hits: int  # 確定KOまでの攻撃回数（最小ダメージベース）
+    probable_ko_analysis: Dict[int, float] = field(default_factory=dict)  # 各攻撃回数でのKO確率
     
     # 計算詳細
     calculation_details: Dict[str, Union[float, int, str]] = field(default_factory=dict)
