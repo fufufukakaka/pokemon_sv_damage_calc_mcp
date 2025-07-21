@@ -157,6 +157,9 @@ class DamageCalculator:
         guaranteed_ko_hits = self._calculate_guaranteed_ko_hits(
             damage_range, current_hp
         )
+        probable_ko_analysis = self._calculate_probable_ko_analysis(
+            damage_range, current_hp, guaranteed_ko_hits
+        )
 
         # 計算詳細を記録
         calculation_details = {
@@ -187,6 +190,7 @@ class DamageCalculator:
             damage_percentage=damage_percentage,
             ko_probability=ko_probability,
             guaranteed_ko_hits=guaranteed_ko_hits,
+            probable_ko_analysis=probable_ko_analysis,
             calculation_details=calculation_details,
         )
 
@@ -354,18 +358,90 @@ class DamageCalculator:
     def _calculate_guaranteed_ko_hits(
         self, damage_range: List[int], current_hp: int
     ) -> int:
-        """確定KOまでの攻撃回数を計算"""
+        """確定KOまでの攻撃回数を計算（最小ダメージベース）"""
         if not damage_range:
             return 999
 
-        max_damage = max(damage_range)
+        min_damage = min(damage_range)
 
-        if max_damage >= current_hp:
+        if min_damage >= current_hp:
             return 1
-        elif max_damage <= 0:
+        elif min_damage <= 0:
             return 999
         else:
-            return math.ceil(current_hp / max_damage)
+            return math.ceil(current_hp / min_damage)
+
+    def _calculate_probable_ko_analysis(
+        self, damage_range: List[int], current_hp: int, guaranteed_hits: int
+    ) -> Dict[int, float]:
+        """
+        乱数x発（確定x発未満での各攻撃回数でのKO確率）を計算
+        
+        Args:
+            damage_range: ダメージ範囲
+            current_hp: 現在HP
+            guaranteed_hits: 確定KO回数
+            
+        Returns:
+            {攻撃回数: KO確率} の辞書
+        """
+        if not damage_range:
+            return {}
+        
+        probable_ko = {}
+        
+        # 確定KO回数未満で各回数でのKO確率を計算
+        for hits in range(1, guaranteed_hits):
+            ko_probability = self._calculate_multi_hit_ko_probability(
+                damage_range, current_hp, hits
+            )
+            # 少しでも確率があるものは記録（0.1%以上）
+            if ko_probability > 0.001:
+                probable_ko[hits] = ko_probability
+        
+        return probable_ko
+
+    def _calculate_multi_hit_ko_probability(
+        self, damage_range: List[int], current_hp: int, hits: int
+    ) -> float:
+        """
+        n回攻撃でのKO確率を計算（簡易版）
+        
+        正確な計算は組み合わせ論で複雑になるため、
+        実用的な近似計算を使用
+        """
+        if hits <= 0:
+            return 0.0
+        
+        if hits == 1:
+            return self._calculate_ko_probability(damage_range, current_hp)
+        
+        # 複数回攻撃の場合の簡易計算
+        # より正確な計算が必要な場合は動的プログラミングを使用
+        total_scenarios = 0
+        ko_scenarios = 0
+        
+        # サンプリングベースの近似計算（実用的な精度）
+        for i, dmg1 in enumerate(damage_range):
+            if hits == 2:
+                for j, dmg2 in enumerate(damage_range):
+                    total_scenarios += 1
+                    if dmg1 + dmg2 >= current_hp:
+                        ko_scenarios += 1
+            elif hits == 3:
+                for j, dmg2 in enumerate(damage_range[::2]):  # サンプリング
+                    for k, dmg3 in enumerate(damage_range[::2]):
+                        total_scenarios += 1
+                        if dmg1 + dmg2 + dmg3 >= current_hp:
+                            ko_scenarios += 1
+            else:
+                # 4回以上は平均ダメージベースの近似
+                avg_damage = sum(damage_range) / len(damage_range)
+                if dmg1 + avg_damage * (hits - 1) >= current_hp:
+                    ko_scenarios += 1
+                total_scenarios += 1
+        
+        return ko_scenarios / total_scenarios if total_scenarios > 0 else 0.0
 
     def get_supported_moves(self) -> List[str]:
         """サポートされている技名のリストを取得"""

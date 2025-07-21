@@ -78,6 +78,7 @@ class DamageResult:
     hp_percentage_max: float
     ko_probability: float
     guaranteed_ko_hits: int
+    probable_ko_analysis: Dict[int, float]
     calculation_details: Dict[str, Any]
 
 
@@ -243,6 +244,11 @@ def calculate_damage(
     """
     ポケモンのダメージを計算します
 
+    返される結果には以下の情報が含まれます：
+    - 基本ダメージ情報（最小/最大/平均）
+    - 確定x発: guaranteed_ko_hits（最小ダメージベースで100%確実にKOできる回数）
+    - 乱数x発: probable_ko_analysis（確定x発未満での各攻撃回数のKO確率）
+
     Args:
         attacker: 攻撃側ポケモンの情報
         defender: 防御側ポケモンの情報
@@ -311,6 +317,7 @@ def calculate_damage(
             hp_percentage_max=max(result.damage_percentage),
             ko_probability=result.ko_probability,
             guaranteed_ko_hits=result.guaranteed_ko_hits,
+            probable_ko_analysis=result.probable_ko_analysis,
             calculation_details=result.calculation_details,
         )
 
