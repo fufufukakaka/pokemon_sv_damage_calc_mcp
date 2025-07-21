@@ -13,17 +13,13 @@ project_root = Path(__file__).parent.parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
 from src.damage_calculator_api.calculators.damage_calculator import (
-    DamageCalculator,
-    create_simple_pokemon,
-)
-from src.damage_calculator_api.models.pokemon_models import (
-    BattleConditions,
-    MoveInput,
-    PokemonState,
-    StatusAilment,
-    TerrainCondition,
-    WeatherCondition,
-)
+    DamageCalculator, create_simple_pokemon)
+from src.damage_calculator_api.models.pokemon_models import (BattleConditions,
+                                                             MoveInput,
+                                                             PokemonState,
+                                                             StatusAilment,
+                                                             TerrainCondition,
+                                                             WeatherCondition)
 
 
 class TestDamageCalculator(unittest.TestCase):
@@ -1826,12 +1822,12 @@ class TestComplexMechanicsAbilities(unittest.TestCase):
         flash_fire_attacker = create_simple_pokemon(
             species="ガブリアス", level=50, ability="もらいび"
         )
-        
+
         # もらい火持ちの防御側
         flash_fire_defender = create_simple_pokemon(
             species="ガブリアス", level=50, ability="もらいび"
         )
-        
+
         # 通常特性のポケモン
         normal_pokemon = create_simple_pokemon(
             species="ガブリアス", level=50, ability="すながくれ"
@@ -1858,13 +1854,210 @@ class TestComplexMechanicsAbilities(unittest.TestCase):
         defense_result = self.calculator.calculate_damage(
             attacker=normal_pokemon, defender=flash_fire_defender, move=fire_move
         )
-        
+
         self.assertEqual(
-            defense_result.max_damage, 0, 
-            "もらい火持ちへのほのお技は無効になるべき"
+            defense_result.max_damage, 0, "もらい火持ちへのほのお技は無効になるべき"
         )
-        
+
         print(f"もらい火防御効果確認 - ダメージ: {defense_result.max_damage} (無効)")
+
+    def test_weight_based_moves(self):
+        """重量依存技のテスト"""
+        # 軽いポケモン (ハネッコ: 0.5kg)
+        lightweight = PokemonState(
+            species="ハネッコ",
+            level=50,
+            stats={
+                "hp": 110,
+                "attack": 55,
+                "defense": 55,
+                "sp_attack": 55,
+                "sp_defense": 95,
+                "speed": 110,
+            },
+            ability="ようりょくそ",
+        )
+
+        # 重いポケモン (ラウドボーン: 326.5kg)
+        heavyweight = PokemonState(
+            species="ラウドボーン",
+            level=50,
+            stats={
+                "hp": 179,
+                "attack": 156,
+                "defense": 95,
+                "sp_attack": 146,
+                "sp_defense": 95,
+                "speed": 75,
+            },
+            ability="もうか",
+        )
+
+        # 中間重量のポケモン (マスカーニャ: 31.2kg)
+        medium_weight = PokemonState(
+            species="マスカーニャ",
+            level=50,
+            stats={
+                "hp": 165,
+                "attack": 126,
+                "defense": 85,
+                "sp_attack": 126,
+                "sp_defense": 85,
+                "speed": 143,
+            },
+            ability="しんりょく",
+        )
+
+        print("\n=== 重量依存技テスト ===")
+
+        # くさむすび（相手の重量に依存）
+        grass_knot = MoveInput(name="くさむすび")
+
+        # 軽い相手 (0.5kg) → 威力20
+        light_result = self.calculator.calculate_damage(
+            attacker=medium_weight, defender=lightweight, move=grass_knot
+        )
+
+        # 重い相手 (326.5kg) → 威力120
+        heavy_result = self.calculator.calculate_damage(
+            attacker=medium_weight, defender=heavyweight, move=grass_knot
+        )
+
+        # 重い相手の方がダメージが大きいことを確認
+        self.assertGreater(
+            heavy_result.min_damage,
+            light_result.max_damage,
+            "重い相手にくさむすびはより多くのダメージを与えるべき"
+        )
+
+        print(f"くさむすび vs 軽い相手 (0.5kg): {light_result.min_damage}-{light_result.max_damage} ダメージ")
+        print(f"くさむすび vs 重い相手 (326.5kg): {heavy_result.min_damage}-{heavy_result.max_damage} ダメージ")
+
+        # けたぐり（相手の重量に依存）
+        low_kick = MoveInput(name="けたぐり")
+
+        low_kick_light = self.calculator.calculate_damage(
+            attacker=medium_weight, defender=lightweight, move=low_kick
+        )
+
+        low_kick_heavy = self.calculator.calculate_damage(
+            attacker=medium_weight, defender=heavyweight, move=low_kick
+        )
+
+        self.assertGreater(
+            low_kick_heavy.min_damage,
+            low_kick_light.max_damage,
+            "重い相手にけたぐりはより多くのダメージを与えるべき"
+        )
+
+        print(f"けたぐり vs 軽い相手 (0.5kg): {low_kick_light.min_damage}-{low_kick_light.max_damage} ダメージ")
+        print(f"けたぐり vs 重い相手 (326.5kg): {low_kick_heavy.min_damage}-{low_kick_heavy.max_damage} ダメージ")
+
+        # ヘビーボンバー（攻撃側と相手の重量比に依存）
+        heavy_slam = MoveInput(name="ヘビーボンバー")
+
+        # 重い攻撃側 vs 軽い相手 → 威力120 (653倍の重量比)
+        slam_result = self.calculator.calculate_damage(
+            attacker=heavyweight, defender=lightweight, move=heavy_slam
+        )
+
+        # 軽い攻撃側 vs 重い相手 → 威力40 (0.0015倍の重量比)
+        weak_slam_result = self.calculator.calculate_damage(
+            attacker=lightweight, defender=heavyweight, move=heavy_slam
+        )
+
+        self.assertGreater(
+            slam_result.min_damage,
+            weak_slam_result.max_damage,
+            "重い攻撃側のヘビーボンバーはより多くのダメージを与えるべき"
+        )
+
+        print(f"ヘビーボンバー 重い→軽い: {slam_result.min_damage}-{slam_result.max_damage} ダメージ")
+        print(f"ヘビーボンバー 軽い→重い: {weak_slam_result.min_damage}-{weak_slam_result.max_damage} ダメージ")
+
+        # ヒートスタンプ（攻撃側と相手の重量比に依存）
+        heat_stamp = MoveInput(name="ヒートスタンプ")
+
+        heat_result = self.calculator.calculate_damage(
+            attacker=heavyweight, defender=lightweight, move=heat_stamp
+        )
+
+        weak_heat_result = self.calculator.calculate_damage(
+            attacker=lightweight, defender=heavyweight, move=heat_stamp
+        )
+
+        self.assertGreater(
+            heat_result.min_damage,
+            weak_heat_result.max_damage,
+            "重い攻撃側のヒートスタンプはより多くのダメージを与えるべき"
+        )
+
+        print(f"ヒートスタンプ 重い→軽い: {heat_result.min_damage}-{heat_result.max_damage} ダメージ")
+        print(f"ヒートスタンプ 軽い→重い: {weak_heat_result.min_damage}-{weak_heat_result.max_damage} ダメージ")
+
+    def test_grass_knot_weight_ranges(self):
+        """くさむすびの重量段階別テスト"""
+        attacker = PokemonState(
+            species="マスカーニャ",
+            level=50,
+            stats={
+                "hp": 165,
+                "attack": 126,
+                "defense": 85,
+                "sp_attack": 126,
+                "sp_defense": 85,
+                "speed": 143,
+            },
+            ability="しんりょく",
+        )
+
+        # 異なる重量のポケモンを想定したテスト用ダミー
+        test_cases = [
+            ("軽量級", "ハネッコ", 0.5),    # 威力20期待
+            ("中軽量級", "クワッス", 6.1),    # 威力20期待  
+            ("中量級", "ニャローテ", 12.2),   # 威力20期待
+            ("中重量級", "マスカーニャ", 31.2), # 威力40期待
+            ("重量級", "ウェーニバル", 61.9),  # 威力60期待
+            ("超重量級", "ラウドボーン", 326.5) # 威力120期待
+        ]
+
+        grass_knot = MoveInput(name="くさむすび")
+        previous_damage = 0
+
+        print("\n=== くさむすび重量段階テスト ===")
+
+        for category, species, weight in test_cases:
+            defender = PokemonState(
+                species=species,
+                level=50,
+                stats={
+                    "hp": 150,
+                    "attack": 100,
+                    "defense": 100,
+                    "sp_attack": 100,
+                    "sp_defense": 100,
+                    "speed": 100,
+                },
+                ability="ノーガード",
+            )
+
+            result = self.calculator.calculate_damage(
+                attacker=attacker, defender=defender, move=grass_knot
+            )
+
+            print(f"{category} ({species}, {weight}kg): {result.min_damage}-{result.max_damage} ダメージ")
+
+            # 重量が増えるにつれてダメージが増加することを確認
+            # （同じ防御力の場合）
+            if weight > 10.0:  # 威力段階が変わる場合のみチェック
+                self.assertGreaterEqual(
+                    result.min_damage,
+                    previous_damage,
+                    f"{category}のダメージが前の重量級以上であるべき"
+                )
+
+            if weight > 50.0:  # 明確に威力が上がるケース
+                previous_damage = result.min_damage
 
 
 if __name__ == "__main__":

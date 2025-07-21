@@ -59,6 +59,7 @@ class PokemonDataLoader:
 
         try:
             self._load_pokemon_species()
+            self._load_weights()
             self._load_moves()
             self._load_items()
             self._load_type_chart()
@@ -129,6 +130,39 @@ class PokemonDataLoader:
 
             except (ValueError, IndexError) as e:
                 logger.warning(f"Failed to parse Pokemon data line: {line} - {e}")
+                continue
+
+    def _load_weights(self) -> None:
+        """ポケモンの重量データを読み込み (weight.txt)"""
+        weight_path = self.data_dir / "weight.txt"
+
+        if not weight_path.exists():
+            logger.warning(f"weight.txt not found at {weight_path}")
+            return
+
+        with open(weight_path, "r", encoding="utf-8") as f:
+            lines = f.readlines()
+
+        # ヘッダー行をスキップ
+        for line in lines[1:]:
+            line = line.strip()
+            if not line:
+                continue
+
+            parts = line.split("\t")
+            if len(parts) < 2:
+                continue
+
+            try:
+                name = parts[0]
+                weight = float(parts[1])
+
+                # 既存のPokemonSpeciesDataに重量を設定
+                if name in self.pokemon_data:
+                    self.pokemon_data[name].weight = weight
+
+            except (ValueError, IndexError) as e:
+                logger.warning(f"Failed to parse weight data line: {line} - {e}")
                 continue
 
     def _load_moves(self) -> None:

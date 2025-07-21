@@ -162,6 +162,14 @@ class StatCalculator:
         既存のBattle.power_correction() を参考に実装
         """
         base_power = move_data.power
+        
+        # 重量依存技の威力計算
+        weight_based_power = self._calculate_weight_based_power(
+            attacker, defender, move, move_data
+        )
+        if weight_based_power > 0:
+            base_power = weight_based_power
+        
         if base_power <= 0:
             return 0
 
@@ -1136,6 +1144,66 @@ class StatCalculator:
                 multiplier *= 5461 / 4096  # ≈ 1.33x
 
         return multiplier
+
+    def _calculate_weight_based_power(
+        self,
+        attacker: PokemonState,
+        defender: PokemonState,
+        move: MoveInput,
+        move_data,
+    ) -> int:
+        """重量依存技の威力を計算"""
+        move_name = move.name
+        
+        # くさむすび、けたぐり（相手の重量に依存）
+        if move_name in ["くさむすび", "けたぐり"]:
+            defender_species_data = self.data_loader.get_pokemon_data(defender.species)
+            if not defender_species_data:
+                return 0
+            
+            weight = defender_species_data.weight
+            
+            if weight <= 10.0:
+                return 20
+            elif weight <= 25.0:
+                return 40
+            elif weight <= 50.0:
+                return 60
+            elif weight <= 100.0:
+                return 80
+            elif weight <= 200.0:
+                return 100
+            else:
+                return 120
+        
+        # ヘビーボンバー、ヒートスタンプ（攻撃側と相手の重量比に依存）
+        elif move_name in ["ヘビーボンバー", "ヒートスタンプ"]:
+            attacker_species_data = self.data_loader.get_pokemon_data(attacker.species)
+            defender_species_data = self.data_loader.get_pokemon_data(defender.species)
+            
+            if not attacker_species_data or not defender_species_data:
+                return 0
+            
+            attacker_weight = attacker_species_data.weight
+            defender_weight = defender_species_data.weight
+            
+            if defender_weight <= 0:
+                return 0  # 重量0の場合は計算不可
+            
+            weight_ratio = attacker_weight / defender_weight
+            
+            if weight_ratio >= 5.0:
+                return 120
+            elif weight_ratio >= 4.0:
+                return 100
+            elif weight_ratio >= 3.0:
+                return 80
+            elif weight_ratio >= 2.0:
+                return 60
+            else:
+                return 40
+        
+        return 0  # 重量依存技でない場合
 
     def _check_type_effectiveness_for_move(
         self, attacker: PokemonState, defender: PokemonState, move_data
